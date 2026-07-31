@@ -4,23 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SHM Scanner Pro</title>
-    <!-- Manifest Link -->
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        :root { --primary: #6366f1; --accent: #f43f5e; --bg: #0f172a; --text: #ffffff; }
+        :root { --primary: #6366f1; --bg: #0f172a; --text: #ffffff; }
         body { background: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
-        #loading-bar { position: fixed; top: 0; left: 0; height: 5px; width: 0%; background: linear-gradient(to right, #f43f5e, #ec4899); transition: width 0.4s ease; z-index: 9999; }
+        #loading-bar { position: fixed; top: 0; left: 0; height: 5px; width: 0%; background: #f43f5e; transition: width 0.4s ease; z-index: 9999; }
         .header { padding: 1rem; text-align: center; font-size: 1.5rem; font-weight: 900; background: linear-gradient(to right, #6366f1, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .step { display: none; flex-direction: column; padding: 20px; gap: 15px; }
         .step.active { display: flex; }
         .btn { background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border: none; padding: 1.2rem; border-radius: 15px; font-weight: bold; cursor: pointer; text-align: center; margin-bottom: 10px; }
         .btn-id { background: linear-gradient(135deg, #f59e0b, #ef4444); }
-        .btn-install { background: #10b981; margin-top: 10px; display: none; } /* ইন্সটল বাটন প্রথমে লুকানো থাকবে */
-        .btn-action { background: #334155; }
-        .editor-container { flex: 1; min-height: 300px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 10px; }
+        .btn-rotate { background: #3b82f6; }
+        .editor-container { flex: 1; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 10px; min-height: 400px; }
+        /* Cropper Handles Style Improvement */
+        .cropper-view-box, .cropper-face { border-radius: 0; }
+        .cropper-point { background-color: #f43f5e !important; width: 20px !important; height: 20px !important; opacity: 1 !important; }
     </style>
 </head>
 <body>
@@ -28,7 +29,6 @@
 <div id="loading-bar"></div>
 <div class="header">SHM SCANNER PRO</div>
 
-<!-- Step 1: Home -->
 <div id="step-1" class="step active">
     <label class="btn">📸 Scan Document (A4) 
         <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="prepareEdit(event, 'doc')">
@@ -36,51 +36,28 @@
     <label class="btn btn-id">🪪 Scan ID Card (Both Side)
         <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="prepareEdit(event, 'id')">
     </label>
-    <!-- Install Button -->
-    <button id="btn-install" class="btn btn-install">📲 Install App (PWA)</button>
+    <button id="btn-install" class="btn" style="background:#10b981; display:none;">📲 Install App</button>
 </div>
 
-<!-- Step 2: Edit/Crop -->
 <div id="step-2" class="step">
     <div class="editor-container"><img id="editor-img" style="max-width:100%"></div>
-    <button class="btn" onclick="savePage()">✅ Save & Confirm</button>
+    <div style="display:flex; gap:10px;">
+        <button class="btn btn-rotate" style="flex:1" onclick="rotateImg()">🔄 Rotate</button>
+        <button class="btn" style="flex:2" onclick="savePage()">✅ Save</button>
+    </div>
 </div>
 
-<!-- Step 3: Results -->
 <div id="step-3" class="step">
     <h3 style="text-align:center;">Pages Scanned: <span id="page-count">0</span></h3>
     <button class="btn btn-id" onclick="goToStep(1)">➕ Add Another Page</button>
     <button class="btn" style="background:#059669" onclick="downloadPDF()">📥 Download PDF</button>
-    <button class="btn" onclick="sharePDF()">✈️ Share WhatsApp</button>
-    <button class="btn btn-action" onclick="window.location.reload()">🏠 Start Over</button>
+    <button class="btn" style="background:#334155" onclick="sharePDF()">✈️ Share WhatsApp</button>
+    <button class="btn" onclick="window.location.reload()">🏠 Start Over</button>
 </div>
 
 <script>
-    // PWA Service Worker Registration
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js');
-    }
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/shmscan/sw.js');
 
-    // Install Button Logic
-    let deferredPrompt;
-    const btnInstall = document.getElementById('btn-install');
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        btnInstall.style.display = 'block'; // বাটন দেখাবে যদি ইন্সটল সম্ভব হয়
-    });
-
-    btnInstall.addEventListener('click', async () => {
-        if (deferredPrompt) {
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            if (outcome === 'accepted') btnInstall.style.display = 'none';
-            deferredPrompt = null;
-        }
-    });
-
-    // বাকি লজিক
     let pages = []; let cropper; let scanMode = 'doc';
 
     function setLoading(isLoading) { document.getElementById('loading-bar').style.width = isLoading ? '100%' : '0%'; }
@@ -90,6 +67,8 @@
         document.getElementById('step-'+s).classList.add('active');
     }
 
+    function rotateImg() { if(cropper) cropper.rotate(90); }
+
     function prepareEdit(e, mode) {
         scanMode = mode;
         const reader = new FileReader();
@@ -98,7 +77,13 @@
             const img = document.getElementById('editor-img');
             img.src = ev.target.result;
             if(cropper) cropper.destroy();
-            cropper = new Cropper(img, { aspectRatio: mode === 'doc' ? 1/1.414 : 1.58, viewMode: 1 });
+            // Optimized Cropper for better touch handling
+            cropper = new Cropper(img, { 
+                aspectRatio: mode === 'doc' ? 1/1.414 : 1.58, 
+                viewMode: 1,
+                autoCropArea: 1, // Full size initial
+                responsive: true
+            });
         };
         reader.readAsDataURL(e.target.files[0]);
         e.target.value = '';
@@ -106,9 +91,12 @@
 
     function savePage() {
         setLoading(true);
-        const canvas = cropper.getCroppedCanvas({ width: 2480, height: 3508 });
-        pages.push(canvas.toDataURL('image/jpeg', 1.0));
+        // Reduced resolution to ensure PDF is not too big
+        const canvas = cropper.getCroppedCanvas({ width: 1240, height: 1754 }); 
+        pages.push(canvas.toDataURL('image/jpeg', 0.7)); // Compressed quality
+        
         if(cropper) cropper.destroy();
+
         if(scanMode === 'id' && pages.length < 2) {
             alert("Front side saved! Now capture the back side.");
             goToStep(1);
@@ -120,36 +108,38 @@
         }
     }
 
-    async function downloadPDF() {
+    async function processPDF() {
         setLoading(true);
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
+        
         if (scanMode === 'id' && pages.length >= 2) {
             pdf.addImage(pages[0], 'JPEG', 10, 10, 190, 120);
             pdf.addImage(pages[1], 'JPEG', 10, 140, 190, 120);
         } else {
-            pages.forEach((p, i) => { if(i > 0) pdf.addPage(); pdf.addImage(p, 'JPEG', 0, 0, 210, 297); });
+            pages.forEach((p, i) => {
+                if(i > 0) pdf.addPage();
+                pdf.addImage(p, 'JPEG', 0, 0, 210, 297);
+            });
         }
+        return pdf;
+    }
+
+    async function downloadPDF() {
+        const pdf = await processPDF();
         pdf.save("SHM_Scan.pdf");
         setLoading(false);
     }
 
     async function sharePDF() {
-        setLoading(true);
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        if (scanMode === 'id' && pages.length >= 2) {
-            pdf.addImage(pages[0], 'JPEG', 10, 10, 190, 120);
-            pdf.addImage(pages[1], 'JPEG', 10, 140, 190, 120);
-        } else {
-            pages.forEach((p, i) => { if(i > 0) pdf.addPage(); pdf.addImage(p, 'JPEG', 0, 0, 210, 297); });
-        }
+        const pdf = await processPDF();
         const blob = pdf.output('blob');
         const file = new File([blob], "SHM_Document.pdf", { type: "application/pdf" });
+        
         if (navigator.share) {
-            await navigator.share({ files: [file], title: 'SHM Scan' });
+            try { await navigator.share({ files: [file], title: 'SHM Scan' }); }
+            catch(err) { alert("Sharing failed. Downloading instead."); downloadPDF(); }
         } else {
-            alert("Sharing not supported, downloading instead.");
             downloadPDF();
         }
         setLoading(false);
