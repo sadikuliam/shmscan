@@ -1,84 +1,56 @@
-// OpenCV লোড হলে এই ফাংশনটি চলবে
-function onOpenCvReady() {
-    console.log("OpenCV.js is ready!");
-}
-// Initialize App
 const video = document.getElementById('video-preview');
+const canvas = document.getElementById('hidden-canvas');
+const scanResult = document.getElementById('scan-result');
+const processedImage = document.getElementById('processed-image');
 
+// ১. ক্যামেরা চালু করা
 async function initCamera() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'environment', width: { ideal: 4096 }, height: { ideal: 2160 } } 
+            video: { facingMode: 'environment' } 
         });
         video.srcObject = stream;
     } catch (err) {
-        console.error("Camera access denied", err);
+        console.error("Camera error:", err);
     }
 }
 
-// Logic for scanning
+// ২. ডকুমেন্ট স্ক্যান ও ইমেজ প্রসেসিং
 document.getElementById('scan-doc-btn').addEventListener('click', () => {
-    // 1. Grab current frame from video
-    const canvas = document.getElementById('hidden-canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0);
     
-    // 2. Perform Image Processing (OpenCV logic here)
-   // ... (আপনার আগের কোড)
-
-// 2. Perform Image Processing
-// alert("Processing Document...");  <-- এই লাইনটি মুছে ফেলুন বা কমেন্ট করে দিন
-
-// OpenCV লজিক এখানে শুরু হচ্ছে
-try {
-    let src = cv.imread('hidden-canvas'); // ক্যানভাস থেকে ছবি রিড করা
+    // OpenCV প্রসেসিং
+    let src = cv.imread(canvas);
     let dst = new cv.Mat();
+    cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY); // গ্রে-স্কেল ফিল্টার
+    cv.imshow(canvas, dst);
     
-    // ছবিটিকে গ্রে-স্কেল (কালো-সাদা) করা
-    cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
+    // UI পরিবর্তন
+    processedImage.src = canvas.toDataURL('image/jpeg');
+    document.getElementById('camera-container').style.display = 'none'; // ক্যামেরা লুকানো
+    scanResult.style.display = 'block'; // রেজাল্ট দেখানো
     
-    // ছবিটিকে আবার ক্যানভাসে দেখানো
-    cv.imshow('hidden-canvas', dst);
-    
-    // মেমরি পরিষ্কার করা (ভুল এড়ানোর জন্য জরুরি)
-    src.delete(); 
-    dst.delete();
-    
-    console.log("Image processed successfully!");
-} catch (err) {
-    console.error("OpenCV processing failed:", err);
-    alert("স্ক্যানিং করার সময় সমস্যা হয়েছে। দয়া করে OpenCV চেক করুন।");
-}
-
-// ... (আপনার পরের কোড)
+    src.delete(); dst.delete();
 });
 
-// PWA Service Worker Registration
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/service-worker.js');
-}
-
-initCamera();
-async function saveAsPDF() {
+// ৩. পিডিএফ সেভ করা
+document.getElementById('save-pdf-btn').addEventListener('click', async () => {
     const { PDFDocument } = PDFLib;
-    const canvas = document.getElementById('hidden-canvas');
-    
-    // ক্যানভাস থেকে ইমেজ ডাটা নেওয়া
-    const imageBytes = await fetch(canvas.toDataURL('image/jpeg')).then(res => res.arrayBuffer());
-    
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([595, 842]); // A4 সাইজ
+    const page = pdfDoc.addPage([595, 842]);
+    const jpgImageBytes = await fetch(processedImage.src).then(res => res.arrayBuffer());
+    const jpgImage = await pdfDoc.embedJpg(jpgImageBytes);
     
-    // ইমেজটিকে পিডিএফ-এ এমবেড করা
-    const jpgImage = await pdfDoc.embedJpg(imageBytes);
     page.drawImage(jpgImage, { x: 50, y: 50, width: 500, height: 700 });
     
-    // পিডিএফ ডাউনলোড করা
     const pdfBytes = await pdfDoc.save();
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'SHM_Scan_' + new Date().getTime() + '.pdf';
+    link.download = 'SHM_Scan.pdf';
     link.click();
-}
+});
+
+initCamera();
