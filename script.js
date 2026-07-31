@@ -2,7 +2,15 @@ const video = document.getElementById('video-preview');
 const canvas = document.getElementById('hidden-canvas');
 const scanResult = document.getElementById('scan-result');
 const processedImage = document.getElementById('processed-image');
-
+document.getElementById('scan-doc-btn').addEventListener('click', () => {
+    // OpenCV চেক করা
+    if (typeof cv === 'undefined' || !cv.Mat) {
+        alert("OpenCV এখনো লোড হচ্ছে, কিছুক্ষণ অপেক্ষা করুন!");
+        return;
+    }
+    
+    // ... বাকি কোড (আপনার আগের দেওয়া কোড এখানে থাকবে)
+});
 // ১. ক্যামেরা চালু করা
 async function initCamera() {
     try {
@@ -54,3 +62,18 @@ document.getElementById('save-pdf-btn').addEventListener('click', async () => {
 });
 
 initCamera();
+// শুরুতে বাটনটি অফ করে রাখুন
+const scanBtn = document.getElementById('scan-doc-btn');
+scanBtn.disabled = true;
+scanBtn.innerText = "Loading OpenCV...";
+
+// OpenCV লোড হলে বাটনটি অন হবে
+function onOpenCvReady() {
+    scanBtn.disabled = false;
+    scanBtn.innerText = "📄 Scan Document";
+    console.log("OpenCV is ready to use");
+}
+// যদি OpenCV সরাসরি লোড না হয়, তবে এই লাইনটি দিয়ে চেক করুন
+cv['onRuntimeInitialized'] = () => {
+    onOpenCvReady();
+};
