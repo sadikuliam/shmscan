@@ -4,20 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SHM Scanner Pro</title>
-    <!-- Libraries -->
+    <!-- Manifest Link -->
+    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         :root { --primary: #6366f1; --accent: #f43f5e; --bg: #0f172a; --text: #ffffff; }
         body { background: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
-        /* Loading Bar */
         #loading-bar { position: fixed; top: 0; left: 0; height: 5px; width: 0%; background: linear-gradient(to right, #f43f5e, #ec4899); transition: width 0.4s ease; z-index: 9999; }
-        .header { padding: 1rem; text-align: center; font-size: 1.5rem; font-weight: 900; background: linear-gradient(to right, #6366f1, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-top: 5px; }
+        .header { padding: 1rem; text-align: center; font-size: 1.5rem; font-weight: 900; background: linear-gradient(to right, #6366f1, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .step { display: none; flex-direction: column; padding: 20px; gap: 15px; }
         .step.active { display: flex; }
         .btn { background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border: none; padding: 1.2rem; border-radius: 15px; font-weight: bold; cursor: pointer; text-align: center; margin-bottom: 10px; }
         .btn-id { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+        .btn-install { background: #10b981; margin-top: 10px; display: none; } /* ইন্সটল বাটন প্রথমে লুকানো থাকবে */
         .btn-action { background: #334155; }
         .editor-container { flex: 1; min-height: 300px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 10px; }
     </style>
@@ -35,6 +36,8 @@
     <label class="btn btn-id">🪪 Scan ID Card (Both Side)
         <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="prepareEdit(event, 'id')">
     </label>
+    <!-- Install Button -->
+    <button id="btn-install" class="btn btn-install">📲 Install App (PWA)</button>
 </div>
 
 <!-- Step 2: Edit/Crop -->
@@ -53,11 +56,34 @@
 </div>
 
 <script>
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js');
+    }
+
+    // Install Button Logic
+    let deferredPrompt;
+    const btnInstall = document.getElementById('btn-install');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        btnInstall.style.display = 'block'; // বাটন দেখাবে যদি ইন্সটল সম্ভব হয়
+    });
+
+    btnInstall.addEventListener('click', async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') btnInstall.style.display = 'none';
+            deferredPrompt = null;
+        }
+    });
+
+    // বাকি লজিক
     let pages = []; let cropper; let scanMode = 'doc';
 
-    function setLoading(isLoading) {
-        document.getElementById('loading-bar').style.width = isLoading ? '100%' : '0%';
-    }
+    function setLoading(isLoading) { document.getElementById('loading-bar').style.width = isLoading ? '100%' : '0%'; }
 
     function goToStep(s) {
         document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
@@ -82,9 +108,7 @@
         setLoading(true);
         const canvas = cropper.getCroppedCanvas({ width: 2480, height: 3508 });
         pages.push(canvas.toDataURL('image/jpeg', 1.0));
-        
         if(cropper) cropper.destroy();
-
         if(scanMode === 'id' && pages.length < 2) {
             alert("Front side saved! Now capture the back side.");
             goToStep(1);
@@ -100,15 +124,11 @@
         setLoading(true);
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
-        
         if (scanMode === 'id' && pages.length >= 2) {
             pdf.addImage(pages[0], 'JPEG', 10, 10, 190, 120);
             pdf.addImage(pages[1], 'JPEG', 10, 140, 190, 120);
         } else {
-            pages.forEach((p, i) => {
-                if(i > 0) pdf.addPage();
-                pdf.addImage(p, 'JPEG', 0, 0, 210, 297);
-            });
+            pages.forEach((p, i) => { if(i > 0) pdf.addPage(); pdf.addImage(p, 'JPEG', 0, 0, 210, 297); });
         }
         pdf.save("SHM_Scan.pdf");
         setLoading(false);
@@ -118,20 +138,14 @@
         setLoading(true);
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
-        
         if (scanMode === 'id' && pages.length >= 2) {
             pdf.addImage(pages[0], 'JPEG', 10, 10, 190, 120);
             pdf.addImage(pages[1], 'JPEG', 10, 140, 190, 120);
         } else {
-            pages.forEach((p, i) => { 
-                if(i > 0) pdf.addPage(); 
-                pdf.addImage(p, 'JPEG', 0, 0, 210, 297); 
-            });
+            pages.forEach((p, i) => { if(i > 0) pdf.addPage(); pdf.addImage(p, 'JPEG', 0, 0, 210, 297); });
         }
-        
         const blob = pdf.output('blob');
         const file = new File([blob], "SHM_Document.pdf", { type: "application/pdf" });
-        
         if (navigator.share) {
             await navigator.share({ files: [file], title: 'SHM Scan' });
         } else {
