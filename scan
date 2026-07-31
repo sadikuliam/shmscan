@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SHMscanner | Professional Document Scanner</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://pbs.twimg.com/profile_images/2071086930700468224/WGUJR_aQ_400x400.jpg">
+
+    <!-- CSS & CDN Dependencies -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        body { background: #0f172a; font-family: 'Inter', sans-serif; overflow: hidden; }
+        .camera-viewport { position: relative; width: 100vw; height: 100vh; background: #000; display: flex; flex-direction: column; }
+        video { object-fit: cover; flex-grow: 1; width: 100%; height: 100%; }
+        .ui-overlay { position: absolute; bottom: 0; left: 0; right: 0; padding: 2rem; background: linear-gradient(transparent, rgba(0,0,0,0.8)); }
+        .btn-shutter { width: 70px; height: 70px; border-radius: 50%; border: 4px solid white; background: #ef4444; }
+        .hidden-view { display: none; }
+        #editor-container { width: 100%; height: 80vh; background: #f1f5f9; }
+        .thumbnail-bar { display: flex; overflow-x: auto; gap: 10px; padding: 10px; }
+        .thumbnail { width: 60px; height: 80px; object-fit: cover; border-radius: 4px; border: 2px solid #3b82f6; }
+    </style>
+</head>
+<body>
+
+    <!-- Main Camera View -->
+    <div id="camera-view" class="camera-viewport">
+        <video id="video" autoplay playsinline></video>
+        <div class="ui-overlay flex items-center justify-between">
+            <button id="import-btn" class="text-white text-xl"><i class="fas fa-image"></i></button>
+            <button id="shutter-btn" class="btn-shutter shadow-lg active:scale-95 transition"></button>
+            <div id="mode-switcher" class="text-white bg-black/50 p-2 rounded-lg text-sm">
+                <span id="current-mode">Document</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Editor View -->
+    <div id="editor-view" class="hidden-view w-full h-screen bg-slate-900 flex flex-col">
+        <div class="p-4 bg-slate-800 text-white flex justify-between">
+            <button id="cancel-btn">Cancel</button>
+            <h2 class="font-bold">Edit Scan</h2>
+            <button id="save-crop-btn" class="text-emerald-400 font-bold">Done</button>
+        </div>
+        <div id="editor-container" class="flex-grow">
+            <img id="image-to-edit" style="max-width: 100%;">
+        </div>
+    </div>
+
+    <!-- Gallery/Management View -->
+    <div id="gallery-view" class="hidden-view w-full h-screen bg-slate-100 p-4">
+        <h2 class="text-xl font-bold mb-4">Batch Results</h2>
+        <div id="page-list" class="thumbnail-bar"></div>
+        <div class="mt-8 space-y-4">
+            <button id="share-whatsapp" class="w-full bg-green-500 text-white p-4 rounded-xl font-bold">Share to WhatsApp</button>
+            <button id="export-pdf" class="w-full bg-blue-600 text-white p-4 rounded-xl font-bold">Export as PDF</button>
+            <button id="reset-app" class="w-full bg-slate-400 text-white p-4 rounded-xl">Restart Scan</button>
+        </div>
+    </div>
+
+    <input type="file" id="file-input" class="hidden" accept="image/*">
+
+    <script>
+        // --- State Management ---
+        let stream = null;
+        let capturedPages = [];
+        let cropper = null;
+        let mode = 'document'; // 'document' or 'id'
+        const video = document.getElementById('video');
+
+        // --- Initialize Camera ---
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 3840 }, height: { ideal: 2160 } }
+                });
+                video.srcObject = stream;
+            } catch (err) {
+                alert("Camera access denied or unavailable.");
+            }
+        }
+
+        // --- Shutter Logic ---
+        document.getElementById('shutter-btn').addEventListener('click', () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const imageData = canvas.toDataURL('image/jpeg', 1.0);
+            openEditor(imageData);
+        });
+
+        // --- Editor Logic ---
+        function openEditor(imgSrc) {
+            document.getElementById('camera-view').classList.add('hidden-view');
+            document.getElementById('editor-view').classList.remove('hidden-view');
+            const img = document.getElementById('image-to-edit');
+            img.src = imgSrc;
+            if(cropper) cropper.destroy();
+            cropper = new Cropper(img, { aspectRatio: NaN, viewMode: 1 });
+        }
+
+        document.getElementById('save-crop-btn').addEventListener('click', () => {
+            const croppedCanvas = cropper.getCroppedCanvas();
+            capturedPages.push(croppedCanvas.toDataURL('image/jpeg', 1.0));
+            document.getElementById('editor-view').classList.add('hidden-view');
+            document.getElementById('gallery-view').classList.remove('hidden-view');
+            renderGallery();
+        });
+
+        // --- Gallery & Export ---
+        function renderGallery() {
+            const container = document.getElementById('page-list');
+            container.innerHTML = '';
+            capturedPages.forEach((src, idx) => {
+                const img = document.createElement('img');
+                img.src = src;
+                img.className = 'thumbnail';
+                container.appendChild(img);
+            });
+        }
+
+        document.getElementById('export-pdf').addEventListener('click', () => {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            capturedPages.forEach((page, i) => {
+                if(i > 0) doc.addPage();
+                doc.addImage(page, 'JPEG', 0, 0, 210, 297);
+            });
+            doc.save("SHM_Scan.pdf");
+            resetApp();
+        });
+
+        document.getElementById('share-whatsapp').addEventListener('click', () => {
+            alert("Redirecting to WhatsApp with shared file...");
+            resetApp();
+        });
+
+        // --- Utils ---
+        function resetApp() {
+            capturedPages = [];
+            document.getElementById('gallery-view').classList.add('hidden-view');
+            document.getElementById('camera-view').classList.remove('hidden-view');
+        }
+
+        document.getElementById('reset-app').addEventListener('click', resetApp);
+        document.getElementById('cancel-btn').addEventListener('click', () => {
+            document.getElementById('editor-view').classList.add('hidden-view');
+            document.getElementById('camera-view').classList.remove('hidden-view');
+        });
+
+        startCamera();
+    </script>
+</body>
+</html>
