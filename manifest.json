@@ -3,18 +3,20 @@
   "name": "SHM Scanner App",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/337/337946.png",
+      "src": "https://pbs.twimg.com/profile_images/2071086930700468224/WGUJR_aQ_400x400.jpg",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/337/337946.png",
+      "src": "https://pbs.twimg.com/profile_images/2071086930700468224/WGUJR_aQ_400x400.jpg",
       "type": "image/png",
       "sizes": "512x512"
     }
   ],
-  "start_url": ".",
-  "background_color": "#121212",
-  "theme_color": "#007bff",
-  "display": "standalone"
+  "start_url": "/shmscan/",
+  "scope": "/shmscan/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#6366f1",
+  "orientation": "portrait"
 }
