@@ -14,10 +14,10 @@
         .header { padding: 1rem; text-align: center; font-size: 1.5rem; font-weight: 900; background: linear-gradient(to right, #6366f1, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .step { display: none; flex-direction: column; padding: 20px; gap: 15px; }
         .step.active { display: flex; }
-        .btn { background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border: none; padding: 1.2rem; border-radius: 15px; font-weight: bold; cursor: pointer; text-align: center; }
+        .btn { background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border: none; padding: 1.2rem; border-radius: 15px; font-weight: bold; cursor: pointer; text-align: center; margin-bottom: 10px; }
         .btn-id { background: linear-gradient(135deg, #f59e0b, #ef4444); }
         .btn-action { background: #334155; }
-        .editor-container { flex: 1; min-height: 300px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .editor-container { flex: 1; min-height: 300px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -63,7 +63,6 @@
             cropper = new Cropper(img, { aspectRatio: mode === 'doc' ? 1/1.414 : 1.58, viewMode: 1 });
         };
         reader.readAsDataURL(e.target.files[0]);
-        // ফাইল ইনপুট রিসেট করা যাতে একই ফাইল দুবার স্ক্যান করা যায়
         e.target.value = '';
     }
 
@@ -71,16 +70,13 @@
         const canvas = cropper.getCroppedCanvas({ width: 2480, height: 3508 });
         pages.push(canvas.toDataURL('image/jpeg', 1.0));
         
-        // ক্রপার রিসেট করা
         if(cropper) cropper.destroy();
 
         if(scanMode === 'id' && pages.length < 2) {
             alert("Front side saved! Now capture the back side.");
-            // রিলোড না করে শুধু আগের স্টেপে ফিরে যাওয়া
             document.getElementById('step-2').classList.remove('active');
             document.getElementById('step-1').classList.add('active');
         } else {
-            // প্রসেস শেষ হলে রেজাল্ট পেজে যাওয়া
             document.getElementById('step-2').classList.remove('active');
             document.getElementById('step-3').classList.add('active');
         }
@@ -89,17 +85,32 @@
     async function downloadPDF() {
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
-        pages.forEach((p, i) => {
-            if(i > 0) pdf.addPage();
-            pdf.addImage(p, 'JPEG', 0, 0, 210, 297);
-        });
+        
+        if (scanMode === 'id' && pages.length >= 2) {
+            pdf.addImage(pages[0], 'JPEG', 10, 10, 190, 120);
+            pdf.addImage(pages[1], 'JPEG', 10, 140, 190, 120);
+        } else {
+            pages.forEach((p, i) => {
+                if(i > 0) pdf.addPage();
+                pdf.addImage(p, 'JPEG', 0, 0, 210, 297);
+            });
+        }
         pdf.save("SHM_Scan.pdf");
     }
 
     async function sharePDF() {
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
-        pages.forEach((p, i) => { if(i > 0) pdf.addPage(); pdf.addImage(p, 'JPEG', 0, 0, 210, 297); });
+        
+        if (scanMode === 'id' && pages.length >= 2) {
+            pdf.addImage(pages[0], 'JPEG', 10, 10, 190, 120);
+            pdf.addImage(pages[1], 'JPEG', 10, 140, 190, 120);
+        } else {
+            pages.forEach((p, i) => { 
+                if(i > 0) pdf.addPage(); 
+                pdf.addImage(p, 'JPEG', 0, 0, 210, 297); 
+            });
+        }
         
         const blob = pdf.output('blob');
         const file = new File([blob], "SHM_Document.pdf", { type: "application/pdf" });
