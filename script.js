@@ -60,3 +60,25 @@ if ('serviceWorker' in navigator) {
 }
 
 initCamera();
+async function saveAsPDF() {
+    const { PDFDocument } = PDFLib;
+    const canvas = document.getElementById('hidden-canvas');
+    
+    // ক্যানভাস থেকে ইমেজ ডাটা নেওয়া
+    const imageBytes = await fetch(canvas.toDataURL('image/jpeg')).then(res => res.arrayBuffer());
+    
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([595, 842]); // A4 সাইজ
+    
+    // ইমেজটিকে পিডিএফ-এ এমবেড করা
+    const jpgImage = await pdfDoc.embedJpg(imageBytes);
+    page.drawImage(jpgImage, { x: 50, y: 50, width: 500, height: 700 });
+    
+    // পিডিএফ ডাউনলোড করা
+    const pdfBytes = await pdfDoc.save();
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'SHM_Scan_' + new Date().getTime() + '.pdf';
+    link.click();
+}
