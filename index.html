@@ -18,12 +18,10 @@
         .btn { background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border: none; padding: 1.2rem; border-radius: 15px; font-weight: bold; cursor: pointer; text-align: center; margin-bottom: 10px; }
         .btn-id { background: linear-gradient(135deg, #f59e0b, #ef4444); }
         .btn-rotate { background: #3b82f6; }
-        
-        /* Container and Cropper Tweaks */
         .editor-container { flex: 1; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 10px; min-height: 400px; position: relative; }
         
-        /* Make handles BIG and inside the box */
-        .cropper-point { background-color: #3b82f6 !important; width: 25px !important; height: 25px !important; opacity: 1 !important; border: 2px solid white; }
+        /* Blue Square Handles */
+        .cropper-point { background-color: #3b82f6 !important; width: 25px !important; height: 25px !important; opacity: 1 !important; border: 2px solid white; border-radius: 5px; }
     </style>
 </head>
 <body>
@@ -44,15 +42,13 @@
 <!-- Step 2 -->
 <div id="step-2" class="step">
     <div class="editor-container"><img id="editor-img" style="max-width:100%"></div>
-    <div style="display:flex; gap:10px;">
-        <button class="btn btn-rotate" style="flex:1" onclick="rotateImg()">🔄 Rotate</button>
-        <button class="btn" style="flex:2" onclick="savePage()">✅ Crop & Confirm</button>
-    </div>
+    <button class="btn" style="width:100%" onclick="savePage()">✅ Crop & Confirm</button>
 </div>
 
 <!-- Step 3 -->
 <div id="step-3" class="step">
     <h3 style="text-align:center;">Pages: <span id="page-count">0</span></h3>
+    <button class="btn btn-rotate" onclick="rotateLastPage()">🔄 Rotate Last Page</button>
     <button class="btn btn-id" onclick="goToStep(1)">➕ Add Another Page</button>
     <button class="btn" style="background:#059669" onclick="downloadPDF()">📥 Download PDF</button>
     <button class="btn" style="background:#334155" onclick="sharePDF()">✈️ Share WhatsApp</button>
@@ -69,12 +65,24 @@
         document.getElementById('step-'+s).classList.add('active');
     }
 
-    function rotateImg() { 
-        if(cropper) {
-            cropper.rotate(90);
-            // Rotated, now reset the crop box so it doesn't go out
-            cropper.setCropBoxData({ left: 0, top: 0, width: 200, height: 300 }); 
-        } 
+    // রেজাল্ট পেজে রোটেট করার জন্য
+    function rotateLastPage() {
+        if (pages.length === 0) return;
+        setLoading(true);
+        const img = new Image();
+        img.src = pages[pages.length - 1];
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.height;
+            canvas.height = img.width;
+            const ctx = canvas.getContext('2d');
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.rotate(90 * Math.PI / 180);
+            ctx.drawImage(img, -img.width / 2, -img.height / 2);
+            pages[pages.length - 1] = canvas.toDataURL('image/jpeg', 0.7);
+            setLoading(false);
+            alert("Page Rotated!");
+        };
     }
 
     function prepareEdit(e, mode) {
@@ -86,12 +94,12 @@
             img.src = ev.target.result;
             if(cropper) cropper.destroy();
             
+            // A4 ratio: 1/1.414
             cropper = new Cropper(img, { 
                 aspectRatio: mode === 'doc' ? 1/1.414 : 1.58, 
-                viewMode: 2, // এটি হ্যান্ডেলগুলোকে পর্দার ভেতরে রাখবে
-                autoCropArea: 0.9,
-                responsive: true,
-                checkCrossOrigin: false
+                viewMode: 2,
+                autoCropArea: 1, 
+                responsive: true
             });
         };
         reader.readAsDataURL(e.target.files[0]);
