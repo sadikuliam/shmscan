@@ -11,7 +11,7 @@
     <style>
         :root { --primary: #6366f1; --accent: #f43f5e; --bg: #0f172a; --text: #ffffff; }
         body { background: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
-        /* Loading Bar Style */
+        /* Loading Bar */
         #loading-bar { position: fixed; top: 0; left: 0; height: 5px; width: 0%; background: linear-gradient(to right, #f43f5e, #ec4899); transition: width 0.4s ease; z-index: 9999; }
         .header { padding: 1rem; text-align: center; font-size: 1.5rem; font-weight: 900; background: linear-gradient(to right, #6366f1, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-top: 5px; }
         .step { display: none; flex-direction: column; padding: 20px; gap: 15px; }
@@ -24,9 +24,7 @@
 </head>
 <body>
 
-<!-- Loading Bar -->
 <div id="loading-bar"></div>
-
 <div class="header">SHM SCANNER PRO</div>
 
 <!-- Step 1: Home -->
@@ -47,7 +45,8 @@
 
 <!-- Step 3: Results -->
 <div id="step-3" class="step">
-    <h3 style="text-align:center;">Document Ready!</h3>
+    <h3 style="text-align:center;">Pages Scanned: <span id="page-count">0</span></h3>
+    <button class="btn btn-id" onclick="goToStep(1)">➕ Add Another Page</button>
     <button class="btn" style="background:#059669" onclick="downloadPDF()">📥 Download PDF</button>
     <button class="btn" onclick="sharePDF()">✈️ Share WhatsApp</button>
     <button class="btn btn-action" onclick="window.location.reload()">🏠 Start Over</button>
@@ -56,18 +55,20 @@
 <script>
     let pages = []; let cropper; let scanMode = 'doc';
 
-    // Loading Bar Helper
     function setLoading(isLoading) {
-        const bar = document.getElementById('loading-bar');
-        bar.style.width = isLoading ? '100%' : '0%';
+        document.getElementById('loading-bar').style.width = isLoading ? '100%' : '0%';
+    }
+
+    function goToStep(s) {
+        document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+        document.getElementById('step-'+s).classList.add('active');
     }
 
     function prepareEdit(e, mode) {
         scanMode = mode;
         const reader = new FileReader();
         reader.onload = (ev) => {
-            document.getElementById('step-1').classList.remove('active');
-            document.getElementById('step-2').classList.add('active');
+            goToStep(2);
             const img = document.getElementById('editor-img');
             img.src = ev.target.result;
             if(cropper) cropper.destroy();
@@ -86,12 +87,11 @@
 
         if(scanMode === 'id' && pages.length < 2) {
             alert("Front side saved! Now capture the back side.");
-            document.getElementById('step-2').classList.remove('active');
-            document.getElementById('step-1').classList.add('active');
+            goToStep(1);
             setLoading(false);
         } else {
-            document.getElementById('step-2').classList.remove('active');
-            document.getElementById('step-3').classList.add('active');
+            document.getElementById('page-count').innerText = pages.length;
+            goToStep(3);
             setLoading(false);
         }
     }
