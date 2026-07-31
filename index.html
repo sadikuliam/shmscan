@@ -49,7 +49,6 @@
 <div id="step-3" class="step">
     <h3 style="text-align:center;">Pages: <span id="page-count">0</span></h3>
     
-    <!-- Small Preview Box Added -->
     <div style="text-align:center; margin: 10px 0;">
         <img id="preview-img" src="" style="max-width:120px; border:2px solid #fff; border-radius:5px; display:none;">
     </div>
@@ -69,8 +68,6 @@
     function goToStep(s) {
         document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
         document.getElementById('step-'+s).classList.add('active');
-        
-        // Step 3 এ গেলে শেষ পেজের প্রিভিউ দেখাবে
         if(s === 3 && pages.length > 0) {
             const preview = document.getElementById('preview-img');
             preview.src = pages[pages.length - 1];
@@ -92,13 +89,8 @@
             ctx.rotate(90 * Math.PI / 180);
             ctx.drawImage(img, -img.width / 2, -img.height / 2);
             const rotatedData = canvas.toDataURL('image/jpeg', 0.7);
-            
             pages[pages.length - 1] = rotatedData;
-            
-            // প্রিভিউ আপডেট করা
-            const preview = document.getElementById('preview-img');
-            preview.src = rotatedData;
-            
+            document.getElementById('preview-img').src = rotatedData;
             setLoading(false);
         };
     }
@@ -112,6 +104,7 @@
             img.src = ev.target.result;
             if(cropper) cropper.destroy();
             
+            // A4 Ratio locked and auto-fill
             cropper = new Cropper(img, { 
                 aspectRatio: mode === 'doc' ? 1/1.414 : 1.58, 
                 viewMode: 2,
