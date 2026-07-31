@@ -1,3 +1,7 @@
+// OpenCV লোড হলে এই ফাংশনটি চলবে
+function onOpenCvReady() {
+    console.log("OpenCV.js is ready!");
+}
 // Initialize App
 const video = document.getElementById('video-preview');
 
