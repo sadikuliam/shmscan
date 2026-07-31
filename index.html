@@ -45,7 +45,7 @@
     <h3 style="text-align:center;">Document Ready!</h3>
     <button class="btn" style="background:#059669" onclick="downloadPDF()">📥 Download PDF</button>
     <button class="btn" onclick="sharePDF()">✈️ Share WhatsApp</button>
-    <button class="btn btn-action" onclick="location.reload()">🏠 Home Page</button>
+    <button class="btn btn-action" onclick="window.location.reload()">🏠 Start Over</button>
 </div>
 
 <script>
@@ -63,16 +63,24 @@
             cropper = new Cropper(img, { aspectRatio: mode === 'doc' ? 1/1.414 : 1.58, viewMode: 1 });
         };
         reader.readAsDataURL(e.target.files[0]);
+        // ফাইল ইনপুট রিসেট করা যাতে একই ফাইল দুবার স্ক্যান করা যায়
+        e.target.value = '';
     }
 
     function savePage() {
         const canvas = cropper.getCroppedCanvas({ width: 2480, height: 3508 });
         pages.push(canvas.toDataURL('image/jpeg', 1.0));
         
+        // ক্রপার রিসেট করা
+        if(cropper) cropper.destroy();
+
         if(scanMode === 'id' && pages.length < 2) {
             alert("Front side saved! Now capture the back side.");
-            location.reload();
+            // রিলোড না করে শুধু আগের স্টেপে ফিরে যাওয়া
+            document.getElementById('step-2').classList.remove('active');
+            document.getElementById('step-1').classList.add('active');
         } else {
+            // প্রসেস শেষ হলে রেজাল্ট পেজে যাওয়া
             document.getElementById('step-2').classList.remove('active');
             document.getElementById('step-3').classList.add('active');
         }
