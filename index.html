@@ -11,7 +11,9 @@
     <style>
         :root { --primary: #6366f1; --accent: #f43f5e; --bg: #0f172a; --text: #ffffff; }
         body { background: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
-        .header { padding: 1rem; text-align: center; font-size: 1.5rem; font-weight: 900; background: linear-gradient(to right, #6366f1, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        /* Loading Bar Style */
+        #loading-bar { position: fixed; top: 0; left: 0; height: 5px; width: 0%; background: linear-gradient(to right, #f43f5e, #ec4899); transition: width 0.4s ease; z-index: 9999; }
+        .header { padding: 1rem; text-align: center; font-size: 1.5rem; font-weight: 900; background: linear-gradient(to right, #6366f1, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-top: 5px; }
         .step { display: none; flex-direction: column; padding: 20px; gap: 15px; }
         .step.active { display: flex; }
         .btn { background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border: none; padding: 1.2rem; border-radius: 15px; font-weight: bold; cursor: pointer; text-align: center; margin-bottom: 10px; }
@@ -21,6 +23,9 @@
     </style>
 </head>
 <body>
+
+<!-- Loading Bar -->
+<div id="loading-bar"></div>
 
 <div class="header">SHM SCANNER PRO</div>
 
@@ -51,6 +56,12 @@
 <script>
     let pages = []; let cropper; let scanMode = 'doc';
 
+    // Loading Bar Helper
+    function setLoading(isLoading) {
+        const bar = document.getElementById('loading-bar');
+        bar.style.width = isLoading ? '100%' : '0%';
+    }
+
     function prepareEdit(e, mode) {
         scanMode = mode;
         const reader = new FileReader();
@@ -67,6 +78,7 @@
     }
 
     function savePage() {
+        setLoading(true);
         const canvas = cropper.getCroppedCanvas({ width: 2480, height: 3508 });
         pages.push(canvas.toDataURL('image/jpeg', 1.0));
         
@@ -76,13 +88,16 @@
             alert("Front side saved! Now capture the back side.");
             document.getElementById('step-2').classList.remove('active');
             document.getElementById('step-1').classList.add('active');
+            setLoading(false);
         } else {
             document.getElementById('step-2').classList.remove('active');
             document.getElementById('step-3').classList.add('active');
+            setLoading(false);
         }
     }
 
     async function downloadPDF() {
+        setLoading(true);
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
         
@@ -96,9 +111,11 @@
             });
         }
         pdf.save("SHM_Scan.pdf");
+        setLoading(false);
     }
 
     async function sharePDF() {
+        setLoading(true);
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
         
@@ -121,6 +138,7 @@
             alert("Sharing not supported, downloading instead.");
             downloadPDF();
         }
+        setLoading(false);
     }
 </script>
 </body>
