@@ -1,99 +1,106 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SHM Scanner Pro</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#6366f1">
+    <!-- Libraries -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         :root { --primary: #6366f1; --accent: #f43f5e; --bg: #0f172a; --text: #ffffff; }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
-        body { background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
-        
-        /* রঙিন বাটন ও ইন্টারফেস */
-        .btn { background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border: none; padding: 1.2rem; border-radius: 20px; font-weight: 700; cursor: pointer; transition: 0.3s; text-align: center; }
-        .btn-id { background: linear-gradient(135deg, #f59e0b, #ef4444); }
-        .controls { padding: 2rem; display: grid; gap: 1rem; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
         .header { padding: 1rem; text-align: center; font-size: 1.5rem; font-weight: 900; background: linear-gradient(to right, #6366f1, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .step { display: none; flex-direction: column; padding: 20px; gap: 15px; }
+        .step.active { display: flex; }
+        .btn { background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border: none; padding: 1.2rem; border-radius: 15px; font-weight: bold; cursor: pointer; text-align: center; }
+        .btn-id { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+        .btn-action { background: #334155; }
+        .editor-container { flex: 1; min-height: 300px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
     </style>
 </head>
 <body>
 
 <div class="header">SHM SCANNER PRO</div>
 
-<!-- হোম পেজ -->
+<!-- Step 1: Home -->
 <div id="step-1" class="step active">
-    <div class="controls">
-        <label class="btn">📸 Scan Document (A4) 
-            <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="handleScan(event, 'doc')">
-        </label>
-        <label class="btn btn-id">🪪 Scan ID Card (Both Side)
-            <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="handleScan(event, 'id')">
-        </label>
-        <button class="btn" style="background:#334155" onclick="importGallery()">📁 Import Gallery</button>
-    </div>
+    <label class="btn">📸 Scan Document (A4) 
+        <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="prepareEdit(event, 'doc')">
+    </label>
+    <label class="btn btn-id">🪪 Scan ID Card (Both Side)
+        <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="prepareEdit(event, 'id')">
+    </label>
 </div>
 
-<!-- এডিটর পেজ -->
-<div id="step-2" class="step" style="display:none;">
-    <div style="flex:1; background:#000;"><img id="editor-image" style="max-width:100%;"></div>
-    <div style="padding:1rem; display:flex; gap:10px;">
-        <button class="btn" onclick="savePage()">✅ Confirm & Crop</button>
-    </div>
+<!-- Step 2: Edit/Crop -->
+<div id="step-2" class="step">
+    <div class="editor-container"><img id="editor-img" style="max-width:100%"></div>
+    <button class="btn" onclick="savePage()">✅ Save & Confirm</button>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Step 3: Results -->
+<div id="step-3" class="step">
+    <h3 style="text-align:center;">Document Ready!</h3>
+    <button class="btn" style="background:#059669" onclick="downloadPDF()">📥 Download PDF</button>
+    <button class="btn" onclick="sharePDF()">✈️ Share WhatsApp</button>
+    <button class="btn btn-action" onclick="location.reload()">🏠 Home Page</button>
+</div>
 
 <script>
-    let pages = []; let scanMode = 'doc'; let cropper;
-    
-    // ক্যামেরা এবং স্ক্যান হ্যান্ডেল
-    function handleScan(e, mode) {
+    let pages = []; let cropper; let scanMode = 'doc';
+
+    function prepareEdit(e, mode) {
         scanMode = mode;
-        const file = e.target.files[0];
         const reader = new FileReader();
         reader.onload = (ev) => {
-            document.getElementById('step-1').style.display = 'none';
-            document.getElementById('step-2').style.display = 'flex';
-            const img = document.getElementById('editor-image');
+            document.getElementById('step-1').classList.remove('active');
+            document.getElementById('step-2').classList.add('active');
+            const img = document.getElementById('editor-img');
             img.src = ev.target.result;
-            cropper = new Cropper(img, { aspectRatio: mode === 'doc' ? 1/1.414 : 1.58 });
+            if(cropper) cropper.destroy();
+            cropper = new Cropper(img, { aspectRatio: mode === 'doc' ? 1/1.414 : 1.58, viewMode: 1 });
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(e.target.files[0]);
     }
 
-    // সেভ ও হোমে ফেরা
-    async function savePage() {
-        const canvas = cropper.getCroppedCanvas({ width: 2480, height: 3508 }); // Ultra HD A4
+    function savePage() {
+        const canvas = cropper.getCroppedCanvas({ width: 2480, height: 3508 });
         pages.push(canvas.toDataURL('image/jpeg', 1.0));
         
-        if(scanMode === 'id' && pages.length % 2 !== 0) {
-            alert("Now capture the Back side of the ID Card");
-            location.reload(); // সিম্পল ফ্ল্লো
+        if(scanMode === 'id' && pages.length < 2) {
+            alert("Front side saved! Now capture the back side.");
+            location.reload();
         } else {
-            alert("Page Saved! Redirecting to Home...");
-            location.href = "index.html"; // হোমে ফেরা
+            document.getElementById('step-2').classList.remove('active');
+            document.getElementById('step-3').classList.add('active');
         }
     }
 
-    // হোয়াটসঅ্যাপ শেয়ারিং
-    async function sharePDF(format) {
+    async function downloadPDF() {
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
         pages.forEach((p, i) => {
             if(i > 0) pdf.addPage();
             pdf.addImage(p, 'JPEG', 0, 0, 210, 297);
         });
+        pdf.save("SHM_Scan.pdf");
+    }
+
+    async function sharePDF() {
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        pages.forEach((p, i) => { if(i > 0) pdf.addPage(); pdf.addImage(p, 'JPEG', 0, 0, 210, 297); });
         
         const blob = pdf.output('blob');
         const file = new File([blob], "SHM_Document.pdf", { type: "application/pdf" });
         
         if (navigator.share) {
             await navigator.share({ files: [file], title: 'SHM Scan' });
-            location.href = "index.html"; // শেয়ার শেষে হোমে ফেরা
+        } else {
+            alert("Sharing not supported, downloading instead.");
+            downloadPDF();
         }
     }
 </script>
