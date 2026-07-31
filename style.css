@@ -1,0 +1,24 @@
+:root {
+    --primary: #3b82f6;
+    --accent: #8b5cf6;
+    --bg-dark: #0f172a;
+    --glass: rgba(255, 255, 255, 0.1);
+}
+
+body, html { margin: 0; padding: 0; background: var(--bg-dark); color: white; font-family: 'Segoe UI', sans-serif; height: 100%; }
+
+#camera-container { width: 100vw; height: 100vh; position: relative; overflow: hidden; }
+video { width: 100%; height: 100%; object-fit: cover; }
+
+.controls-overlay { 
+    position: absolute; bottom: 30px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 20px; 
+}
+
+.btn-primary, .btn-secondary {
+    padding: 15px 40px; border-radius: 50px; border: none; font-weight: bold; cursor: pointer;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+    transition: transform 0.2s;
+}
+
+.btn-primary:active { transform: scale(0.95); }
