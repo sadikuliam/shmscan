@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Splitter & Optimizer</title>
+    
+    <!-- Libraries via CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --text-color: #333;
+            --primary: #4f46e5;
+            --accent: #818cf8;
+            --card-bg: rgba(255, 255, 255, 0.8);
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #0f172a;
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --text-color: #f8fafc;
+            --card-bg: rgba(30, 41, 59, 0.8);
+        }
+
+        body { font-family: 'Segoe UI', system-ui; background: var(--bg-color); color: var(--text-color); transition: all 0.3s; margin: 0; padding: 20px; }
+        
+        .glass { background: var(--glass-bg); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        
+        #drop-zone { border: 2px dashed var(--primary); padding: 40px; text-align: center; cursor: pointer; border-radius: 16px; margin-bottom: 20px; transition: 0.3s; }
+        #drop-zone:hover { background: rgba(79, 70, 229, 0.1); }
+
+        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; margin-top: 20px; }
+        .page-card { background: var(--card-bg); padding: 15px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .page-card img { width: 100%; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        
+        .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; background: var(--primary); color: white; font-weight: 600; transition: 0.2s; }
+        .btn:hover { opacity: 0.9; }
+        
+        .progress-container { width: 100%; height: 8px; background: #ddd; border-radius: 4px; margin: 10px 0; overflow: hidden; }
+        #progress-bar { height: 100%; background: var(--primary); width: 0%; transition: width 0.3s; }
+        
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<header class="glass">
+    <h1>PDF Splitter & Optimizer</h1>
+    <button class="btn" onclick="toggleTheme()">Toggle Theme</button>
+</header>
+
+<div id="drop-zone" class="glass" onclick="document.getElementById('file-input').click()">
+    <p>Drag & Drop PDF or Click to Upload</p>
+    <input type="file" id="file-input" class="hidden" accept="application/pdf">
+</div>
+
+<div id="dashboard" class="glass hidden">
+    <div id="file-info"></div>
+    <div style="margin: 20px 0;">
+        <button class="btn" onclick="selectAll()">Select All</button>
+        <button class="btn" onclick="deselectAll()">Deselect All</button>
+        <button class="btn" onclick="processSelected()" style="background: #059669;">Process & Download Selected</button>
+    </div>
+    <div class="progress-container"><div id="progress-bar"></div></div>
+    <div id="status"></div>
+    <div id="gallery" class="gallery"></div>
+</div>
+
+<script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    let originalDoc = null;
+    let pagesData = [];
+
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+
+    fileInput.onchange = (e) => handleFile(e.target.files[0]);
+
+    function toggleTheme() {
+        document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+    }
+
+    async function handleFile(file) {
+        if (!file || file.type !== 'application/pdf') return alert('Please upload a PDF');
+        
+        const arrayBuffer = await file.arrayBuffer();
+        originalDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        
+        document.getElementById('dashboard').classList.remove('hidden');
+        document.getElementById('file-info').innerHTML = `<h3>${file.name}</h3><p>Total Pages: ${originalDoc.numPages}</p>`;
+        
+        renderThumbnails();
+    }
+
+    async function renderThumbnails() {
+        const gallery = document.getElementById('gallery');
+        gallery.innerHTML = '';
+        pagesData = [];
+
+        for (let i = 1; i <= originalDoc.numPages; i++) {
+            const page = await originalDoc.getPage(i);
+            const viewport = page.getViewport({ scale: 0.5 });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            await page.render({ canvasContext: context, viewport }).promise;
+            
+            const pageObj = {
+                id: i,
+                selected: true,
+                imgSrc: canvas.toDataURL()
+            };
+            pagesData.push(pageObj);
+
+            const card = document.createElement('div');
+            card.className = 'page-card';
+            card.innerHTML = `
+                <input type="checkbox" checked onchange="toggleSelect(${i})">
+                <p>Page ${i}</p>
+                <img src="${pageObj.imgSrc}">
+                <button class="btn" style="font-size: 12px;" onclick="processSingle(${i})">Download</button>
+            `;
+            gallery.appendChild(card);
+        }
+    }
+
+    function toggleSelect(id) {
+        const page = pagesData.find(p => p.id === id);
+        page.selected = !page.selected;
+    }
+    
+    function selectAll() { pagesData.forEach(p => p.selected = true); updateUI(); }
+    function deselectAll() { pagesData.forEach(p => p.selected = false); updateUI(); }
+
+    function updateUI() {
+        const checkboxes = document.querySelectorAll('.page-card input');
+        checkboxes.forEach((cb, idx) => cb.checked = pagesData[idx].selected);
+    }
+
+    // Compression Logic: Canvas -> Blob -> PDF
+    async function getCompressedPdf(pageNumber) {
+        const page = await originalDoc.getPage(pageNumber);
+        const viewport = page.getViewport({ scale: 1.5 });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+        let quality = 0.9;
+        let blob;
+        
+        // Iterative compression loop
+        do {
+            blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+            if (blob.size < 170000 || quality <= 0.1) break; 
+            quality -= 0.1;
+        } while (true);
+
+        // Embed into pdf-lib PDF
+        const pdfDoc = await PDFLib.PDFDocument.create();
+        const jpgImage = await pdfDoc.embedJpg(await blob.arrayBuffer());
+        const pdfPage = pdfDoc.addPage([jpgImage.width, jpgImage.height]);
+        pdfPage.drawImage(jpgImage, { x: 0, y: 0, width: jpgImage.width, height: jpgImage.height });
+        
+        const pdfBytes = await pdfDoc.save();
+        return { bytes: pdfBytes, size: pdfBytes.length };
+    }
+
+    async function processSelected() {
+        const selected = pagesData.filter(p => p.selected);
+        if (selected.length === 0) return alert('No pages selected');
+
+        const zip = new JSZip();
+        const progressBar = document.getElementById('progress-bar');
+        
+        for (let i = 0; i < selected.length; i++) {
+            const p = selected[i];
+            const progress = ((i + 1) / selected.length) * 100;
+            progressBar.style.width = `${progress}%`;
+            document.getElementById('status').innerText = `Processing page ${p.id}...`;
+
+            const result = await getCompressedPdf(p.id);
+            zip.file(`page_${p.id}.pdf`, result.bytes);
+        }
+
+        document.getElementById('status').innerText = 'Generating Zip...';
+        const content = await zip.generateAsync({ type: "blob" });
+        saveAs(content, "split_pdfs.zip");
+        document.getElementById('status').innerText = 'Complete!';
+    }
+
+    async function processSingle(id) {
+        document.getElementById('status').innerText = `Compressing page ${id}...`;
+        const result = await getCompressedPdf(id);
+        saveAs(new Blob([result.bytes]), `page_${id}_optimized.pdf`);
+        document.getElementById('status').innerText = 'Done!';
+    }
+</script>
+</body>
+</html>
