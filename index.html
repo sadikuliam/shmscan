@@ -1,43 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-    <script async src="https://docs.opencv.org/4.5.0/opencv.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SHM Scanner</title>
+    <!-- External Libraries -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script async src="https://docs.opencv.org/4.5.0/opencv.js"></script>
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
 </head>
 <body>
     <div id="app">
-        <!-- Camera Viewport -->
         <div id="camera-container">
             <video id="video-preview" autoplay playsinline></video>
             <canvas id="hidden-canvas" style="display:none;"></canvas>
-            <div id="scan-result" style="display:none;">
-    <img id="processed-image" />
-    <button id="save-pdf-btn">Save as PDF</button>
-</div>
+            
+            <!-- Result UI -->
+            <div id="scan-result" style="display:none; text-align:center; padding: 20px;">
+                <img id="processed-image" style="max-width: 90%; border: 2px solid white;" />
+                <br>
+                <button id="save-pdf-btn" class="btn-primary">💾 Save as PDF</button>
+                <button onclick="location.reload()" class="btn-secondary">📸 Scan Again</button>
+            </div>
         </div>
 
-        <!-- Floating UI -->
         <div class="controls-overlay">
             <div class="action-buttons">
                 <button id="scan-doc-btn" class="btn-primary">📄 Scan Document</button>
-                <button id="scan-id-btn" class="btn-secondary">🪪 Scan ID</button>
             </div>
             <nav class="bottom-nav">
                 <button>📁 Import</button>
                 <button>⚙ Settings</button>
-                <button>🕒 History</button>
             </nav>
         </div>
     </div>
 
-    <!-- Scripts -->
-    <script src="assets/lib/opencv.js"></script>
-    <script src="assets/lib/pdf-lib.min.js"></script>
+    <!-- Main Logic -->
     <script src="script.js"></script>
 </body>
 </html>
