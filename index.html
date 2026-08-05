@@ -85,8 +85,8 @@
     </div>
 </header>
 
-<a href="compress.html" class="action-banner">
-    <span><i class="fa-solid fa-file-arrow-down"></i> Split & Compress External PDFs</span>
+<a href="#" onclick="openMergeModal(); return false;" class="action-banner">
+    <span><i class="fa-solid fa-file-circle-plus"></i> Merge More PDFs</span>
     <i class="fa-solid fa-arrow-right"></i>
 </a>
 
@@ -95,19 +95,19 @@
     <div id="loader-text">Processing Document...</div>
 </div>
 
-<!-- Split Range Modal -->
-<div id="split-modal" class="modal">
+<!-- Merge PDF Modal -->
+<div id="merge-modal" class="modal">
     <div class="modal-content">
-        <h3><i class="fa-solid fa-scissors"></i> Split PDF Range</h3>
-        <p style="font-size: 0.85rem; color: var(--text-muted);">Export a specific portion of your document pages.</p>
-        <div style="display:flex; gap:10px; align-items:center;">
-            <input type="number" id="split-from" placeholder="From (e.g. 1)" min="1" style="width:100%; padding:10px; background:var(--bg); border:1px solid var(--border); color:white; border-radius:8px;">
-            <span>to</span>
-            <input type="number" id="split-to" placeholder="To (e.g. 3)" min="1" style="width:100%; padding:10px; background:var(--bg); border:1px solid var(--border); color:white; border-radius:8px;">
-        </div>
+        <h3><i class="fa-solid fa-file-circle-plus"></i> Merge External PDF</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Select an external PDF file to append its pages into your current scanner project.</p>
+        <label class="btn btn-outline" style="border-style: dashed; padding: 1.5rem; cursor: pointer; text-align: center;">
+            <i class="fa-solid fa-cloud-arrow-up fa-xl"></i><br><br>
+            <span id="selected-file-label">Choose PDF File</span>
+            <input type="file" id="merge-pdf-input" accept="application/pdf" style="display:none;" onchange="handleMergeFileSelected(event)">
+        </label>
         <div class="btn-group" style="margin-top:0.5rem;">
-            <button class="btn btn-outline" onclick="closeSplitModal()">Cancel</button>
-            <button class="btn" onclick="executeSplitPDF()">Export Range</button>
+            <button class="btn btn-outline" onclick="closeMergeModal()">Cancel</button>
+            <button class="btn" id="confirm-merge-btn" onclick="executeMergePDF()" disabled>Merge PDF</button>
         </div>
     </div>
 </div>
@@ -145,7 +145,7 @@
 <div id="step-3" class="step">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
         <h3 id="page-count-title" style="font-size: 1rem; font-weight: 600;">Scanned Pages (0)</h3>
-        <button class="btn btn-outline" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;" onclick="openSplitModal()"><i class="fa-solid fa-scissors"></i> Split PDF</button>
+        <button class="btn btn-outline" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;" onclick="openMergeModal()"><i class="fa-solid fa-file-circle-plus"></i> Merge PDF</button>
     </div>
     <div class="grid" id="pages-grid"></div>
     <div style="margin-top:auto; display:flex; flex-direction:column; gap:8px; padding-top: 1rem;">
@@ -160,7 +160,10 @@
 <!-- External Libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
     // --- PWA Logic ---
     let deferredPrompt;
     const installBtn = document.getElementById('install-btn');
@@ -187,6 +190,7 @@
     let pages = []; 
     let cropper = null;
     let currentFilter = 'original';
+    let selectedMergeFile = null;
     const editorImg = document.getElementById('editor-image');
     
     function goToStep(s) {
@@ -282,14 +286,13 @@
             for (let i = 0; i < data.length; i += 4) {
                 let avg = (data[i] * 0.3) + (data[i + 1] * 0.59) + (data[i + 2] * 0.11);
                 if (filter === 'bw') {
-                    avg = avg > 130 ? 255 : 0; // High contrast threshold
+                    avg = avg > 130 ? 255 : 0; 
                 } else if (filter === 'magic') {
-                    // Boost contrast for clear document text
                     avg = avg < 100 ? avg * 0.8 : (avg > 200 ? 255 : avg);
                 }
-                data[i] = avg;     // R
-                data[i + 1] = avg; // G
-                data[i + 2] = avg; // B
+                data[i] = avg;   
+                data[i + 1] = avg; 
+                data[i + 2] = avg; 
             }
             ctx.putImageData(imgData, 0, 0);
         }
@@ -350,33 +353,60 @@
         }
     }
 
-    function openSplitModal() {
-        if(pages.length === 0) return alert("No pages available to split.");
-        document.getElementById('split-from').value = 1;
-        document.getElementById('split-to').value = pages.length;
-        document.getElementById('split-modal').style.display = 'flex';
+    // --- Merge Feature Implementation ---
+    function openMergeModal() {
+        selectedMergeFile = null;
+        document.getElementById('selected-file-label').innerText = "Choose PDF File";
+        document.getElementById('confirm-merge-btn').disabled = true;
+        document.getElementById('merge-pdf-input').value = "";
+        document.getElementById('merge-modal').style.display = 'flex';
     }
 
-    function closeSplitModal() {
-        document.getElementById('split-modal').style.display = 'none';
+    function closeMergeModal() {
+        document.getElementById('merge-modal').style.display = 'none';
     }
 
-    function executeSplitPDF() {
-        let from = parseInt(document.getElementById('split-from').value) - 1;
-        let to = parseInt(document.getElementById('split-to').value);
-        
-        if(isNaN(from) || isNaN(to) || from < 0 || to > pages.length || from >= to) {
-            return alert("Please enter a valid page range.");
+    function handleMergeFileSelected(e) {
+        const file = e.target.files[0];
+        if (file) {
+            selectedMergeFile = file;
+            document.getElementById('selected-file-label').innerText = file.name;
+            document.getElementById('confirm-merge-btn').disabled = false;
         }
-        
-        const subset = pages.slice(from, to);
-        const blob = generatePdfBlob(subset);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; 
-        a.download = `Split_Document_Pages_${from+1}_to_${to}.pdf`; 
-        a.click();
-        closeSplitModal();
+    }
+
+    async function executeMergePDF() {
+        if (!selectedMergeFile) return;
+
+        closeMergeModal();
+        document.getElementById('loader-overlay').style.display = 'flex';
+        document.getElementById('loader-text').innerText = 'Merging PDF pages...';
+
+        try {
+            const arrayBuffer = await selectedMergeFile.arrayBuffer();
+            const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+            const pdfDoc = await loadingTask.promise;
+
+            for (let i = 1; i <= pdfDoc.numPages; i++) {
+                const page = await pdfDoc.getPage(i);
+                const viewport = page.getViewport({ scale: 1.5 });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                pages.push(canvas.toDataURL('image/jpeg', 0.92));
+            }
+
+            document.getElementById('loader-overlay').style.display = 'none';
+            renderGrid();
+            if(pages.length > 0) goToStep(3);
+        } catch (error) {
+            console.error("Error merging PDF:", error);
+            document.getElementById('loader-overlay').style.display = 'none';
+            alert("Failed to read and merge the PDF file. Please ensure it is a valid PDF.");
+        }
     }
 </script>
 </body>
